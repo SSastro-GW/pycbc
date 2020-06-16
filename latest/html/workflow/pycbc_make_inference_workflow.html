@@ -1,0 +1,653 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>pycbc_make_inference_workflow: A parameter estimation workflow generator &mdash; PyCBC 0405a9 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+        <script type="text/javascript" src="../_static/typed.min.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/graphviz.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/terminal.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/theme_overrides.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="pycbc_make_inference_inj_workflow: A parameter estimation workflow generator for injections" href="pycbc_make_inference_inj_workflow.html" />
+    <link rel="prev" title="Plotting the posteriors (pycbc_inference_plot_posterior)" href="../inference/viz.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> PyCBC
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.16.2
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../credit.html">Use of PyCBC in Scientific Publications</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../docker.html">Running PyCBC under Docker</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installing PyCBC</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="pycbc_make_psd_estimation_workflow.html"><code class="docutils literal notranslate"><span class="pre">pycbc_make_psd_estimation_workflow</span></code>: A workflow generator for noise estimation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pycbc_make_coinc_search_workflow.html"><code class="docutils literal notranslate"><span class="pre">pycbc_make_coinc_search_workflow</span></code>: A workflow to search for gravitational waves</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pygrb.html"><code class="docutils literal notranslate"><span class="pre">pycbc_make_offline_grb_workflow</span></code>: A GRB triggered CBC analysis workflow generator</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../inference.html">PyCBC inference documentation (<code class="docutils literal notranslate"><span class="pre">pycbc.inference</span></code>)</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../inference.html#introduction">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../inference.html#sampling-the-parameter-space-pycbc-inference">Sampling the parameter space (<code class="docutils literal notranslate"><span class="pre">pycbc_inference</span></code>)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../inference.html#examples">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../inference.html#visualizing-the-posteriors">Visualizing the Posteriors</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../inference.html#workflows">Workflows</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#"><code class="docutils literal notranslate"><span class="pre">pycbc_make_inference_workflow</span></code>: A parameter estimation workflow generator</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#workflow-configuration-file">Workflow configuration file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#inference-configuration-file">Inference configuration file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#generate-the-workflow">Generate the workflow</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#plan-and-execute-the-workflow">Plan and execute the workflow</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pycbc_make_inference_inj_workflow.html"><code class="docutils literal notranslate"><span class="pre">pycbc_make_inference_inj_workflow</span></code>: A parameter estimation workflow generator for injections</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../inference.html#for-developers">For Developers</a></li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tmpltbank.html">PyCBC template bank generation documentation (<code class="docutils literal notranslate"><span class="pre">pycbc.tmpltbank</span></code>)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../hwinj.html">Hardware injection waveform generation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../banksim.html">Calculating the Effectualness (Fitting Factor) of Template Banks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faithsim.html">Dag Generator for Doing Faithfulness Comparisons</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../upload_to_gracedb.html">Uploading triggers to gracedb</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../catalog.html">Catalog of Observed Gravitational-wave Mergers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dataquality.html">Query times of valid data, hardware injections, and more.</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../frame.html">Reading Gravitational-wave Frames</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gw150914.html">Signal Processing with GW150914</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../detector.html">Gravitational-wave Detectors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../psd.html">Handling PSDs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../noise.html">Generating Noise</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../waveform.html">Waveforms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filter.html">Filtering</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../distributions.html">Using PyCBC Distributions from PyCBC Inference</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../building_bundled_executables.html">Building Bundled Executables</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../documentation.html">Documenting PyCBC code</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../release.html">Creating Releases of PyCBC</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../formats/hdf_format.html">HDF files within the PyCBC workflow</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow: the inspiral analysis workflow generator (<code class="docutils literal notranslate"><span class="pre">pycbc.workflow</span></code>)</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">pycbc</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PyCBC</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../inference.html">PyCBC inference documentation (<code class="docutils literal notranslate"><span class="pre">pycbc.inference</span></code>)</a> &raquo;</li>
+        
+      <li><code class="docutils literal notranslate"><span class="pre">pycbc_make_inference_workflow</span></code>: A parameter estimation workflow generator</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/workflow/pycbc_make_inference_workflow.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="pycbc-make-inference-workflow-a-parameter-estimation-workflow-generator">
+<h1><code class="docutils literal notranslate"><span class="pre">pycbc_make_inference_workflow</span></code>: A parameter estimation workflow generator<a class="headerlink" href="#pycbc-make-inference-workflow-a-parameter-estimation-workflow-generator" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<p>The executable <code class="docutils literal notranslate"><span class="pre">pycbc_make_inference_workflow</span></code> is a workflow generator to setup a parameter estimation analysis.</p>
+</div>
+<div class="section" id="workflow-configuration-file">
+<h2>Workflow configuration file<a class="headerlink" href="#workflow-configuration-file" title="Permalink to this headline">¶</a></h2>
+<p>A sample workflow configuration file:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[workflow]</span>
+<span class="c1">; basic information used by the workflow generator</span>
+<span class="na">file-retention-level</span> <span class="o">=</span> <span class="s">all_triggers</span>
+<span class="na">h1-channel-name</span> <span class="o">=</span> <span class="s">H1:DCS-CALIB_STRAIN_C02</span>
+<span class="na">l1-channel-name</span> <span class="o">=</span> <span class="s">L1:DCS-CALIB_STRAIN_C02</span>
+<span class="na">start-time</span> <span class="o">=</span> <span class="s">1126259452</span>
+<span class="na">end-time</span> <span class="o">=</span> <span class="s">1126259468</span>
+
+<span class="k">[workflow-ifos]</span>
+<span class="c1">; the IFOs to analyze</span>
+<span class="na">h1</span> <span class="o">=</span>
+<span class="na">l1</span> <span class="o">=</span>
+
+<span class="k">[workflow-datafind]</span>
+<span class="c1">; how the workflow generator should get frame data</span>
+<span class="na">datafind-h1-frame-type</span> <span class="o">=</span> <span class="s">H1_HOFT_C02</span>
+<span class="na">datafind-l1-frame-type</span> <span class="o">=</span> <span class="s">L1_HOFT_C02</span>
+<span class="na">datafind-method</span> <span class="o">=</span> <span class="s">AT_RUNTIME_SINGLE_FRAMES</span>
+<span class="na">datafind-check-segment-gaps</span> <span class="o">=</span> <span class="s">raise_error</span>
+<span class="na">datafind-check-frames-exist</span> <span class="o">=</span> <span class="s">raise_error</span>
+<span class="na">datafind-check-segment-summary</span> <span class="o">=</span> <span class="s">no_test</span>
+
+<span class="k">[workflow-inference]</span>
+<span class="c1">; how the workflow generator should setup inference nodes</span>
+<span class="na">num-events</span> <span class="o">=</span> <span class="s">1</span>
+<span class="na">plot-1d-mass</span> <span class="o">=</span> <span class="s">mass1 mass2 mchirp q</span>
+<span class="na">plot-1d-orientation</span> <span class="o">=</span> <span class="s">ra dec tc polarization inclination coa_phase</span>
+<span class="na">plot-1d-distance</span> <span class="o">=</span> <span class="s">distance redshift</span>
+
+<span class="k">[executables]</span>
+<span class="c1">; paths to executables to use in workflow</span>
+<span class="na">inference</span> <span class="o">=</span> <span class="s">${which:pycbc_inference}</span>
+<span class="na">inference_posterior</span> <span class="o">=</span> <span class="s">${which:pycbc_inference_plot_posterior}</span>
+<span class="na">inference_prior</span> <span class="o">=</span> <span class="s">${which:pycbc_inference_plot_prior}</span>
+<span class="na">inference_rate</span> <span class="o">=</span> <span class="s">${which:pycbc_inference_plot_acceptance_rate}</span>
+<span class="na">inference_samples</span> <span class="o">=</span> <span class="s">${which:pycbc_inference_plot_samples}</span>
+<span class="na">inference_table</span> <span class="o">=</span> <span class="s">${which:pycbc_inference_table_summary}</span>
+<span class="na">plot_spectrum</span> <span class="o">=</span> <span class="s">${which:pycbc_plot_psd_file}</span>
+<span class="na">results_page</span> <span class="o">=</span> <span class="s">${which:pycbc_make_html_page}</span>
+
+<span class="k">[datafind]</span>
+<span class="c1">; datafind options</span>
+<span class="na">urltype</span> <span class="o">=</span> <span class="s">file</span>
+
+<span class="k">[inference]</span>
+<span class="c1">; command line options use --help for more information</span>
+<span class="na">verbose</span> <span class="o">=</span>
+<span class="na">sample-rate</span> <span class="o">=</span> <span class="s">2048</span>
+<span class="na">strain-high-pass</span> <span class="o">=</span> <span class="s">20</span>
+<span class="na">pad-data</span> <span class="o">=</span> <span class="s">8</span>
+<span class="na">psd-estimation</span> <span class="o">=</span> <span class="s">median</span>
+<span class="na">psd-segment-length</span> <span class="o">=</span> <span class="s">16</span>
+<span class="na">psd-segment-stride</span> <span class="o">=</span> <span class="s">8</span>
+<span class="na">psd-inverse-length</span> <span class="o">=</span> <span class="s">16</span>
+<span class="na">processing-scheme</span> <span class="o">=</span> <span class="s">mkl</span>
+<span class="na">data-conditioning-low-freq</span> <span class="o">=</span> <span class="s">25</span>
+
+<span class="k">[pegasus_profile-inference]</span>
+<span class="c1">; pegasus profile for inference nodes</span>
+<span class="na">condor|request_memory</span> <span class="o">=</span> <span class="s">20G</span>
+<span class="na">condor|request_cpus</span> <span class="o">=</span> <span class="s">12 </span>
+
+<span class="k">[inference_posterior]</span>
+<span class="c1">; command line options use --help for more information</span>
+<span class="na">plot-density</span> <span class="o">=</span>
+<span class="na">plot-contours</span> <span class="o">=</span>
+<span class="na">plot-marginal</span> <span class="o">=</span>
+<span class="na">z-arg</span> <span class="o">=</span> <span class="s">snr</span>
+
+<span class="k">[inference_prior]</span>
+<span class="c1">; command line options use --help for more information</span>
+
+<span class="k">[inference_rate]</span>
+<span class="c1">; command line options use --help for more information</span>
+
+<span class="k">[inference_samples]</span>
+<span class="c1">; command line options use --help for more information</span>
+
+<span class="k">[inference_table]</span>
+<span class="c1">; command line options use --help for more information</span>
+
+<span class="k">[plot_spectrum]</span>
+<span class="c1">; command line options use --help for more information</span>
+
+<span class="k">[results_page]</span>
+<span class="c1">; command line options use --help for more information</span>
+<span class="na">analysis-title</span> <span class="o">=</span> <span class="s">&quot;PyCBC Inference Test&quot;</span>
+</pre></div>
+</div>
+<p><a class="reference download internal" download="" href="../_downloads/9436b25ea714ab496add6f51905d83c6/workflow_config.ini"><code class="xref download docutils literal notranslate"><span class="pre">Download</span></code></a></p>
+</div>
+<div class="section" id="inference-configuration-file">
+<h2>Inference configuration file<a class="headerlink" href="#inference-configuration-file" title="Permalink to this headline">¶</a></h2>
+<p>You will also need a configuration file with sections that tells <code class="docutils literal notranslate"><span class="pre">pycbc_inference</span></code> how to construct the priors. A sample inference configuration file is:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[model]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">marginalized_phase</span>
+<span class="na">h1-low-frequency-cutoff</span> <span class="o">=</span> <span class="s">20</span>
+<span class="na">l1-low-frequency-cutoff</span> <span class="o">=</span> <span class="s">20</span>
+
+<span class="k">[sampler]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">emcee_pt</span>
+<span class="na">nwalkers</span> <span class="o">=</span> <span class="s">1000</span>
+<span class="na">ntemps</span> <span class="o">=</span> <span class="s">4</span>
+<span class="na">effective-nsamples</span> <span class="o">=</span> <span class="s">2000</span>
+<span class="na">checkpoint-interval</span> <span class="o">=</span> <span class="s">2000</span>
+<span class="na">max-samples-per-chain</span> <span class="o">=</span> <span class="s">1000</span>
+
+<span class="k">[sampler-burn_in]</span>
+<span class="na">burn-in-test</span> <span class="o">=</span> <span class="s">nacl &amp; max_posterior</span>
+
+<span class="k">[variable_params]</span>
+<span class="c1">; waveform parameters that will vary in MCMC</span>
+<span class="na">tc</span> <span class="o">=</span>
+<span class="na">mass1</span> <span class="o">=</span>
+<span class="na">mass2</span> <span class="o">=</span>
+<span class="na">spin1_a</span> <span class="o">=</span>
+<span class="na">spin1_azimuthal</span> <span class="o">=</span>
+<span class="na">spin1_polar</span> <span class="o">=</span>
+<span class="na">spin2_a</span> <span class="o">=</span>
+<span class="na">spin2_azimuthal</span> <span class="o">=</span>
+<span class="na">spin2_polar</span> <span class="o">=</span>
+<span class="na">distance</span> <span class="o">=</span>
+<span class="na">inclination</span> <span class="o">=</span>
+<span class="na">polarization</span> <span class="o">=</span>
+<span class="na">ra</span> <span class="o">=</span>
+<span class="na">dec</span> <span class="o">=</span>
+
+<span class="k">[static_params]</span>
+<span class="c1">; waveform parameters that will not change in MCMC</span>
+<span class="na">approximant</span> <span class="o">=</span> <span class="s">IMRPhenomPv2</span>
+<span class="na">f_lower</span> <span class="o">=</span> <span class="s">18</span>
+<span class="na">f_ref</span> <span class="o">=</span> <span class="s">20</span>
+
+<span class="k">[prior-tc]</span>
+<span class="c1">; coalescence time prior</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform</span>
+<span class="na">min-tc</span> <span class="o">=</span> <span class="s">1126259462.32</span>
+<span class="na">max-tc</span> <span class="o">=</span> <span class="s">1126259462.52</span>
+
+<span class="k">[prior-mass1]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform</span>
+<span class="na">min-mass1</span> <span class="o">=</span> <span class="s">10.</span>
+<span class="na">max-mass1</span> <span class="o">=</span> <span class="s">80.</span>
+
+<span class="k">[prior-mass2]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform</span>
+<span class="na">min-mass2</span> <span class="o">=</span> <span class="s">10.</span>
+<span class="na">max-mass2</span> <span class="o">=</span> <span class="s">80.</span>
+
+<span class="k">[prior-spin1_a]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform</span>
+<span class="na">min-spin1_a</span> <span class="o">=</span> <span class="s">0.0</span>
+<span class="na">max-spin1_a</span> <span class="o">=</span> <span class="s">0.99</span>
+
+<span class="k">[prior-spin1_polar+spin1_azimuthal]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform_solidangle</span>
+<span class="na">polar-angle</span> <span class="o">=</span> <span class="s">spin1_polar</span>
+<span class="na">azimuthal-angle</span> <span class="o">=</span> <span class="s">spin1_azimuthal</span>
+
+<span class="k">[prior-spin2_a]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform</span>
+<span class="na">min-spin2_a</span> <span class="o">=</span> <span class="s">0.0</span>
+<span class="na">max-spin2_a</span> <span class="o">=</span> <span class="s">0.99</span>
+
+<span class="k">[prior-spin2_polar+spin2_azimuthal]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform_solidangle</span>
+<span class="na">polar-angle</span> <span class="o">=</span> <span class="s">spin2_polar</span>
+<span class="na">azimuthal-angle</span> <span class="o">=</span> <span class="s">spin2_azimuthal</span>
+
+<span class="k">[prior-distance]</span>
+<span class="c1">; following gives a uniform volume prior</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform_radius</span>
+<span class="na">min-distance</span> <span class="o">=</span> <span class="s">10</span>
+<span class="na">max-distance</span> <span class="o">=</span> <span class="s">1000</span>
+
+<span class="k">[prior-inclination]</span>
+<span class="c1">; inclination prior</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">sin_angle</span>
+
+<span class="k">[prior-ra+dec]</span>
+<span class="c1">; sky position prior</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform_sky</span>
+
+<span class="k">[prior-polarization]</span>
+<span class="c1">; polarization prior</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform_angle</span>
+
+<span class="k">[waveform_transforms-spin1x+spin1y+spin1z]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">spherical_spin_1_to_cartesian_spin_1</span>
+
+<span class="k">[waveform_transforms-spin2x+spin2y+spin2z]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">spherical_spin_2_to_cartesian_spin_2</span>
+
+<span class="c1">;</span>
+<span class="c1">;   Sampling transforms</span>
+<span class="c1">;</span>
+<span class="k">[sampling_params]</span>
+<span class="c1">; parameters on the left will be sampled in</span>
+<span class="c1">; parametes on the right</span>
+<span class="na">mass1, mass2 : mchirp, q</span>
+
+<span class="k">[sampling_transforms-mchirp+q]</span>
+<span class="c1">; inputs mass1, mass2</span>
+<span class="c1">; outputs mchirp, q</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">mass1_mass2_to_mchirp_q</span>
+</pre></div>
+</div>
+<p><a class="reference download internal" download="" href="../_downloads/595e2828ba87ac212bb4554b8446be71/inference.ini"><code class="xref download docutils literal notranslate"><span class="pre">Download</span></code></a></p>
+<p>A sample configuration file for parameter estimation on the ringdown is:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[model]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">gaussian_noise</span>
+<span class="na">h1-low-frequency-cutoff</span> <span class="o">=</span> <span class="s">20</span>
+<span class="na">l1-low-frequency-cutoff</span> <span class="o">=</span> <span class="s">20</span>
+
+<span class="k">[sampler]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">emcee_pt</span>
+<span class="na">nwalkers</span> <span class="o">=</span> <span class="s">1000</span>
+<span class="na">ntemps</span> <span class="o">=</span> <span class="s">4</span>
+<span class="na">effective-nsamples</span> <span class="o">=</span> <span class="s">2000</span>
+<span class="na">checkpoint-interval</span> <span class="o">=</span> <span class="s">1000</span>
+
+<span class="k">[sampler-burn_in]</span>
+<span class="na">burn-in-test</span> <span class="o">=</span> <span class="s">nacl &amp; max_posterior</span>
+
+<span class="k">[variable_args]</span>
+<span class="c1">; waveform parameters that will vary in MCMC</span>
+<span class="na">final_mass</span> <span class="o">=</span>
+<span class="na">final_spin</span> <span class="o">=</span>
+<span class="na">amp220</span> <span class="o">=</span>
+<span class="na">phi220</span> <span class="o">=</span>
+<span class="na">inclination</span> <span class="o">=</span>
+
+<span class="k">[static_args]</span>
+<span class="c1">; waveform parameters that will not change in MCMC</span>
+<span class="na">approximant</span> <span class="o">=</span> <span class="s">TdQNMfromFinalMassSpin</span>
+<span class="na">lmns</span> <span class="o">=</span> <span class="s">[&#39;221&#39;]</span>
+<span class="na">tc</span> <span class="o">=</span> <span class="s">1126259462</span>
+<span class="na">ra</span> <span class="o">=</span> <span class="s">2.2</span>
+<span class="na">dec</span> <span class="o">=</span> <span class="s">-1.24</span>
+<span class="na">polarization</span> <span class="o">=</span> <span class="s">0.</span>
+<span class="na">f_lower</span> <span class="o">=</span> <span class="s">18.</span>
+<span class="na">f_ref</span> <span class="o">=</span> <span class="s">20.</span>
+
+<span class="k">[prior-final_mass]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform</span>
+<span class="na">min-final_mass</span> <span class="o">=</span> <span class="s">20.</span>
+<span class="na">max-final_mass</span> <span class="o">=</span> <span class="s">100.</span>
+
+<span class="k">[prior-final_spin]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform</span>
+<span class="na">min-final_spin</span> <span class="o">=</span> <span class="s">-0.99</span>
+<span class="na">max-final_spin</span> <span class="o">=</span> <span class="s">0.99</span>
+
+<span class="k">[prior-amp220]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform_log10</span>
+<span class="na">min-amp220</span> <span class="o">=</span> <span class="s">1e-30</span>
+<span class="na">max-amp220</span> <span class="o">=</span> <span class="s">1e-10</span>
+
+<span class="k">[prior-phi220]</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">uniform_angle</span>
+
+<span class="k">[prior-inclination]</span>
+<span class="c1">; inclination prior</span>
+<span class="na">name</span> <span class="o">=</span> <span class="s">sin_angle</span>
+</pre></div>
+</div>
+<p><a class="reference download internal" download="" href="../_downloads/5f179f913c76eafc355c481c3fb9cb59/ringdown_inference.ini"><code class="xref download docutils literal notranslate"><span class="pre">Download</span></code></a></p>
+<p>If you want to use another variable parameter in the inference sampler then add its name to <code class="docutils literal notranslate"><span class="pre">[variable_args]</span></code> and add a prior section like shown above.</p>
+</div>
+<div class="section" id="generate-the-workflow">
+<h2>Generate the workflow<a class="headerlink" href="#generate-the-workflow" title="Permalink to this headline">¶</a></h2>
+<p>To generate a workflow you will need your configuration files. If you want to run on the loudest triggers from a PyCBC coincident search workflow then run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /bin/bash</span>
+
+<span class="nb">set</span> -e
+
+<span class="c1"># name of the workflow</span>
+<span class="nv">WORKFLOW_NAME</span><span class="o">=</span><span class="s2">&quot;search_triggers&quot;</span>
+
+<span class="c1"># path to output dir</span>
+<span class="nv">OUTPUT_DIR</span><span class="o">=</span>output
+
+<span class="c1"># input configuration files</span>
+<span class="nv">CONFIG_PATH</span><span class="o">=</span>workflow.ini
+<span class="nv">INFERENCE_CONFIG_PATH</span><span class="o">=</span>inference.ini
+
+<span class="c1"># directory that will be populated with HTML pages</span>
+<span class="nv">HTML_DIR</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/public_html/inference_test
+
+<span class="c1"># run workflow generator on triggers from workflow</span>
+pycbc_make_inference_workflow --workflow-name <span class="si">${</span><span class="nv">WORKFLOW_NAME</span><span class="si">}</span> <span class="se">\</span>
+    --config-files <span class="si">${</span><span class="nv">CONFIG_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --inference-config-file <span class="si">${</span><span class="nv">INFERENCE_CONFIG_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --output-dir <span class="si">${</span><span class="nv">OUTPUT_DIR</span><span class="si">}</span> <span class="se">\</span>
+    --output-file <span class="si">${</span><span class="nv">WORKFLOW_NAME</span><span class="si">}</span>.dax <span class="se">\</span>
+    --output-map <span class="si">${</span><span class="nv">OUTPUT_MAP_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --bank-file <span class="si">${</span><span class="nv">BANK_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --statmap-file <span class="si">${</span><span class="nv">STATMAP_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --single-detector-triggers <span class="si">${</span><span class="nv">SNGL_H1_PATHS</span><span class="si">}</span> <span class="si">${</span><span class="nv">SNGL_L1_PATHS</span><span class="si">}</span>
+    --config-overrides workflow:start-time:<span class="si">${</span><span class="nv">WORKFLOW_START_TIME</span><span class="si">}</span> <span class="se">\</span>
+                       workflow:end-time:<span class="si">${</span><span class="nv">WORKFLOW_END_TIME</span><span class="si">}</span> <span class="se">\</span>
+                       workflow-inference:data-seconds-before-trigger:8 <span class="se">\</span>
+                       workflow-inference:data-seconds-after-trigger:8 <span class="se">\</span>
+                       results_page:output-path:<span class="si">${</span><span class="nv">HTML_DIR</span><span class="si">}</span> <span class="se">\</span>
+                       results_page:analysis-subtitle:<span class="si">${</span><span class="nv">WORKFLOW_NAME</span><span class="si">}</span>
+</pre></div>
+</div>
+<p><a class="reference download internal" download="" href="../_downloads/e792bda2bc7bb71ba5b18b07833f1bcd/run_pycbc_make_inference_workflow.sh"><code class="xref download docutils literal notranslate"><span class="pre">Download</span></code></a></p>
+<p>Where <code class="docutils literal notranslate"><span class="pre">${BANK_FILE}</span></code> is the path to the template bank HDF file, <code class="docutils literal notranslate"><span class="pre">${STATMAP_FILE}</span></code> is the path to the combined statmap HDF file, <code class="docutils literal notranslate"><span class="pre">${SNGL_H1_PATHS}</span></code> and <code class="docutils literal notranslate"><span class="pre">${SNGL_L1_PATHS}</span></code> are the paths to the merged single-detector HDF files,  and <code class="docutils literal notranslate"><span class="pre">${WORKFLOW_START_TIME}</span></code> and <code class="docutils literal notranslate"><span class="pre">${WORKFLOW_END_TIME}</span></code> are the start and end time of the coincidence workflow.</p>
+<p>Else you can run from a specific GPS end time with the <code class="docutils literal notranslate"><span class="pre">--gps-end-time</span></code> option like:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /bin/bash</span>
+
+<span class="nb">set</span> -e
+
+<span class="c1"># name of the workflow</span>
+<span class="nv">WORKFLOW_NAME</span><span class="o">=</span><span class="s2">&quot;event&quot;</span>
+
+<span class="c1"># path to output dir</span>
+<span class="nv">OUTPUT_DIR</span><span class="o">=</span>output
+
+<span class="c1"># input configuration files</span>
+<span class="nv">CONFIG_PATH</span><span class="o">=</span>workflow.ini
+<span class="nv">INFERENCE_CONFIG_PATH</span><span class="o">=</span>inference.ini
+
+<span class="c1"># directory that will be populated with HTML pages</span>
+<span class="nv">HTML_DIR</span><span class="o">=</span><span class="si">${</span><span class="nv">HOME</span><span class="si">}</span>/public_html/inference_test
+
+<span class="c1"># run workflow generator on specific GPS end time</span>
+pycbc_make_inference_workflow --workflow-name <span class="si">${</span><span class="nv">WORKFLOW_NAME</span><span class="si">}</span> <span class="se">\</span>
+    --config-files <span class="si">${</span><span class="nv">CONFIG_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --inference-config-file <span class="si">${</span><span class="nv">INFERENCE_CONFIG_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --output-dir <span class="si">${</span><span class="nv">OUTPUT_DIR</span><span class="si">}</span> <span class="se">\</span>
+    --output-file <span class="si">${</span><span class="nv">WORKFLOW_NAME</span><span class="si">}</span>.dax <span class="se">\</span>
+    --output-map <span class="si">${</span><span class="nv">OUTPUT_MAP_PATH</span><span class="si">}</span> <span class="se">\</span>
+    --gps-end-time <span class="si">${</span><span class="nv">GPS_END_TIME</span><span class="si">}</span> <span class="se">\</span>
+    --config-overrides workflow:start-time:<span class="k">$((</span><span class="si">${</span><span class="nv">GPS_END_TIME</span><span class="si">}</span><span class="o">-</span><span class="m">2</span><span class="k">))</span> <span class="se">\</span>
+                       workflow:end-time:<span class="k">$((</span><span class="si">${</span><span class="nv">GPS_END_TIME</span><span class="si">}</span><span class="o">+</span><span class="m">2</span><span class="k">))</span> <span class="se">\</span>
+                       workflow-inference:data-seconds-before-trigger:2 <span class="se">\</span>
+                       workflow-inference:data-seconds-after-trigger:2 <span class="se">\</span>
+                       inference:psd-start-time:<span class="k">$((</span><span class="si">${</span><span class="nv">GPS_END_TIME</span><span class="si">}</span><span class="o">-</span><span class="m">300</span><span class="k">))</span> <span class="se">\</span>
+                       inference:psd-end-time:<span class="k">$((</span><span class="si">${</span><span class="nv">GPS_END_TIME</span><span class="si">}</span><span class="o">+</span><span class="m">1748</span><span class="k">))</span> <span class="se">\</span>
+                       results_page:output-path:<span class="si">${</span><span class="nv">HTML_DIR</span><span class="si">}</span> <span class="se">\</span>
+                       results_page:analysis-subtitle:<span class="si">${</span><span class="nv">WORKFLOW_NAME</span><span class="si">}</span>
+</pre></div>
+</div>
+<p><a class="reference download internal" download="" href="../_downloads/2f965a4eb1b5c4de8c0b11951b5f7dfa/run_pycbc_make_inference_workflow_2.sh"><code class="xref download docutils literal notranslate"><span class="pre">Download</span></code></a></p>
+<p>Where <code class="docutils literal notranslate"><span class="pre">${GPS_END_TIME}</span></code> is the GPS end time of the trigger.</p>
+<p>For the CBC example above define the environment variables <code class="docutils literal notranslate"><span class="pre">GPS_END_TIME=1126259462</span></code> and <code class="docutils literal notranslate"><span class="pre">OUTPUT_MAP_PATH=output.map</span></code>.</p>
+</div>
+<div class="section" id="plan-and-execute-the-workflow">
+<h2>Plan and execute the workflow<a class="headerlink" href="#plan-and-execute-the-workflow" title="Permalink to this headline">¶</a></h2>
+<p>If you are on LDG, you need to define an accounting group. Plan and submit the workflow with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># submit workflow
+cd ${OUTPUT_DIR}
+pycbc_submit_dax --dax ${WORKFLOW_NAME}.dax \
+    --no-grid \
+    --enable-shared-filesystem \
+    --accounting-group ${ACCOUNTING_GROUP}
+</pre></div>
+</div>
+<p>Where <code class="docutils literal notranslate"><span class="pre">${ACCOUNTING_GROUP}</span></code> is the appropriate tag for your workflow.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="pycbc_make_inference_inj_workflow.html" class="btn btn-neutral float-right" title="pycbc_make_inference_inj_workflow: A parameter estimation workflow generator for injections" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../inference/viz.html" class="btn btn-neutral float-left" title="Plotting the posteriors (pycbc_inference_plot_posterior)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, 2016, 2017, Alexander Nitz, Ian Harry, Christopher M. Biwer, Duncan A.  Brown, Josh Willis, and Tito Dal Canton
+      <span class="lastupdated">
+        Last updated on Jun 16, 2020.
+      </span>
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

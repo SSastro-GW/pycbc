@@ -1,0 +1,8 @@
+<map id="inheritancefdd5703eb5" name="inheritancefdd5703eb5">
+<area shape="rect" id="node1" href="../pycbc.inference.io.html#pycbc.inference.io.base_hdf.BaseInferenceFile" target="_top" title="Base class for all inference hdf files." alt="" coords="16,4,190,26"/>
+<area shape="rect" id="node5" href="../pycbc.inference.io.html#pycbc.inference.io.base_sampler.BaseSamplerFile" target="_top" title="Base HDF class for all samplers." alt="" coords="4,66,201,87"/>
+<area shape="rect" id="node2" href="../pycbc.inference.io.html#pycbc.inference.io.base_mcmc.MCMCMetadataIO" target="_top" title="Provides functions for reading/writing MCMC metadata to file." alt="" coords="531,4,726,26"/>
+<area shape="rect" id="node4" href="../pycbc.inference.io.html#pycbc.inference.io.base_multitemper.MultiTemperedMetadataIO" target="_top" title="Adds support for reading/writing multi&#45;tempered metadata to" alt="" coords="493,66,764,87"/>
+<area shape="rect" id="node3" href="../pycbc.inference.io.html#pycbc.inference.io.base_multitemper.MultiTemperedMCMCIO" target="_top" title="Provides functions for reading/writing samples from a parallel&#45;tempered" alt="" coords="221,66,473,87"/>
+<area shape="rect" id="node6" href="../pycbc.inference.io.html#pycbc.inference.io.epsie.EpsieFile" target="_top" title="Class to handle IO for Epsie&#39;s parallel&#45;tempered sampler." alt="" coords="293,127,401,148"/>
+</map>
