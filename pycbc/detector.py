@@ -345,7 +345,7 @@ class LISA(object):
         n = np.array(range(1, 4))
         kappa, _lambda_ = 0, 0
         alpha = 2. * np.pi * ref_time/1 + kappa
-        beta_n = (n - 1) * 2.0 * pi / 3.0 + _lambda_
+        beta_n = (n - 1) * 2.0 * np.pi / 3.0 + _lambda_
         a, L = 1., 0.03342293561
         e = L/(2. * a * np.sqrt(3))
 
