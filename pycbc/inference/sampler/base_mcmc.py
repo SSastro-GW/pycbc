@@ -454,8 +454,14 @@ class BaseMCMC(object):
     def set_start_from_config(self, cp):
         """Sets the initial state of the sampler from config file
         """
-        init_prior = initial_dist_from_config(cp, self.variable_params)
-        self.set_p0(prior=init_prior)
+        if cp.has_option('sampler', 'start-file'):
+            start_file = cp.get('sampler', 'start-file')
+            logging.info("Using file %s for initial positions", start_file)
+            init_prior = None
+        else:
+            start_file = None
+            init_prior = initial_dist_from_config(cp, self.variable_params)
+        self.set_p0(samples_file=start_file, prior=init_prior)
 
     def resume_from_checkpoint(self):
         """Resume the sampler from the checkpoint file
@@ -607,6 +613,10 @@ class BaseMCMC(object):
                         fp.acl = self.acl
                     # write effective number of samples
                     fp.write_effective_nsamples(self.effective_nsamples)
+        # write history
+        for fn in [self.checkpoint_file, self.backup_file]:
+            with self.io(fn, "a") as fp:
+                fp.update_checkpoint_history()
         # check validity
         logging.info("Validating checkpoint and backup files")
         checkpoint_valid = validate_checkpoint_files(
@@ -961,5 +971,5 @@ def ensemble_compute_acl(filename, start_index=None, end_index=None,
                 acl = numpy.inf
             acls[param] = acl
         maxacl = numpy.array(list(acls.values())).max()
-        logging.info("ACT: %s", str(maxacl*fp.thin_interval))
+        logging.info("ACT: %s", str(maxacl*fp.thinned_by))
     return acls

@@ -10,6 +10,7 @@ export HDF5_USE_FILE_LOCKING="FALSE"
 gps_start_time=1272790000
 gps_end_time=1272790500
 
+
 # test if there is a template bank. If not, make one
 
 if [[ ! -f template_bank.hdf ]]
@@ -36,60 +37,60 @@ then
 
     mv template_bank_0.hdf template_bank.hdf
     rm -f template_bank_*.hdf
+else
+    echo -e "\\n\\n>> [`date`] Pre-existing template bank found"
 fi
 
-# test if there is a hwinj file. If not, make one.
-# if a new inj is made, delete old strain and output files
 
+# test if there is a injection file.
+# If not, make one and delete any existing strain
 
-
-
-if [[ "$(echo ./hwinjcbc*.xml.gz)" != "./hwinjcbc*.xml.gz" ]]
+if [[ -f injections.hdf ]]
 then
-    inj_names='./hwinjcbc*.xml.gz'
-    echo -e "\\n\\n>> [`date`] Pre-existing Inj Xml Found"
-    
-else echo -e "\\n\\n>> [`date`] Generating injection"
-    if [[ -d ./strain ]]
-    then rm -r ./strain
-    fi
-    
-    if [[ -d ./output ]]
-    then rm -r ./output
-    fi
-    
-    # this will be replaced with a python script in future
-    bash generate_injections.sh
-    
-    inj_names='./hwinjcbc*.xml.gz' 
+    echo -e "\\n\\n>> [`date`] Pre-existing injections found"
+else
+    echo -e "\\n\\n>> [`date`] Generating injections"
+
+    rm -rf ./strain
+
+    ./generate_injections.py
 fi
 
-inj_file=${inj_names[0]} 
 
 # test if strain files exist. If they dont, make them
 
 if [[ ! -d ./strain ]]
-then        
+then
     echo -e "\\n\\n>> [`date`] Generating simulated strain"
-    
+
     function simulate_strain { # detector PSD_model random_seed
         mkdir -p strain/$1
+
+        out_path="strain/$1/$1-SIMULATED_STRAIN-{start}-{duration}.gwf"
+
         pycbc_condition_strain \
             --fake-strain $2 \
             --fake-strain-seed $3 \
-            --output-strain-file "strain/$1/$1-SIMULATED_STRAIN-{start}-{duration}.gwf" \
+            --output-strain-file $out_path \
             --gps-start-time $gps_start_time \
             --gps-end-time $gps_end_time \
             --sample-rate 16384 \
             --low-frequency-cutoff 10 \
             --channel-name $1:SIMULATED_STRAIN \
             --frame-duration 32 \
-            --injection-file $inj_file
+            --injection-file injections.hdf
     }
+
     simulate_strain H1 aLIGOMidLowSensitivityP1200087 1234
     simulate_strain L1 aLIGOMidLowSensitivityP1200087 2345
     simulate_strain V1 AdVEarlyLowSensitivityP1200087 3456
+else
+    echo -e "\\n\\n>> [`date`] Pre-existing strain data found"
 fi
+
+
+# delete old outputs if they exist
+rm -rf ./output
 
 
 echo -e "\\n\\n>> [`date`] Running PyCBC Live"
@@ -150,7 +151,8 @@ python -m mpi4py `which pycbc_live` \
 --max-batch-size 16777216 \
 --output-path output \
 --day-hour-output-prefix \
---background-statistic newsnr_sgveto \
+--ranking-statistic quadsum \
+--sngl-ranking newsnr_sgveto \
 --sgchisq-snr-threshold 4 \
 --sgchisq-locations "mtotal>40:20-30,20-45,20-60,20-75,20-90,20-105,20-120" \
 --enable-background-estimation \

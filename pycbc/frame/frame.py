@@ -23,6 +23,7 @@ import numpy
 import math
 import os.path, glob, time
 import gwdatafind
+import pycbc
 from six.moves.urllib.parse import urlparse
 from pycbc.types import TimeSeries, zeros
 
@@ -341,6 +342,13 @@ def query_and_read_frame(frame_type, channels, start_time, end_time,
     """
     # Allows compatibility with our standard tools
     # We may want to place this into a higher level frame getting tool
+    if frame_type == 'LOSC_STRAIN':
+        from pycbc.frame.losc import read_strain_losc
+        if not isinstance(channels, list):
+            channels = [channels]
+        data = [read_strain_losc(c[:2], start_time, end_time)
+                for c in channels]
+        return data if len(data) > 1 else data[0]
     if frame_type == 'LOSC':
         from pycbc.frame.losc import read_frame_losc
         return read_frame_losc(channels, start_time, end_time)
@@ -593,7 +601,6 @@ class DataBuffer(object):
             name = '%s/%s-%s-%s.gwf' % (pattern, self.beg, s, self.dur)
             # check that file actually exists, else abort now
             if not os.path.exists(name):
-                logging.info("%s not found yet", os.path.basename(name))
                 raise RuntimeError
 
             keys.append(name)
@@ -629,14 +636,14 @@ class DataBuffer(object):
             return DataBuffer.advance(self, blocksize)
 
         except RuntimeError:
-            if lal.GPSTimeNow() > timeout + self.raw_buffer.end_time:
+            if pycbc.gps_now() > timeout + self.raw_buffer.end_time:
                 # The frame is not there and it should be by now, so we give up
                 # and treat it as zeros
                 DataBuffer.null_advance(self, blocksize)
                 return None
             else:
                 # I am too early to give up on this frame, so we should try again
-                time.sleep(1)
+                time.sleep(0.1)
                 return self.attempt_advance(blocksize, timeout=timeout)
 
 class StatusBuffer(DataBuffer):

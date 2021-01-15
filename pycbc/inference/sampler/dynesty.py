@@ -34,7 +34,8 @@ import copy
 import os
 import time
 import numpy
-import dynesty
+import dynesty, dynesty.dynesty, dynesty.nestedsamplers
+from dynesty.utils import unitcheck, reflect
 from pycbc.pool import choose_pool
 from dynesty import utils as dyfunc
 from pycbc.inference.io import (DynestyFile, validate_checkpoint_files,
@@ -80,7 +81,6 @@ class DynestySampler(BaseSampler):
         self.model = model
         log_likelihood_call, prior_call = setup_calls(
             model,
-            nprocesses=nprocesses,
             loglikelihood_function=loglikelihood_function)
         # Set up the pool
         self.pool = choose_pool(mpi=use_mpi, processes=nprocesses)
@@ -97,12 +97,41 @@ class DynestySampler(BaseSampler):
         if self.checkpoint_time_interval:
             self.run_with_checkpoint = True
             if self.maxcall is None:
-                self.maxcall = 5000 * nprocesses
+                self.maxcall = 5000 * self.pool.size
             logging.info("Checkpointing enabled, will verify every %s calls"
                          " and try to checkpoint every %s seconds",
                          self.maxcall, self.checkpoint_time_interval)
         else:
             self.run_with_checkpoint = False
+
+        # Check for cyclic boundaries
+        periodic = []
+        cyclic = self.model.prior_distribution.cyclic
+        for i, param in enumerate(self.variable_params):
+            if param in cyclic:
+                logging.info('Param: %s will be cyclic', param)
+                periodic.append(i)
+
+        if len(periodic) == 0:
+            periodic = None
+
+        # Check for reflected boundaries. Dynesty only supports
+        # reflection on both min and max of boundary.
+        reflective = []
+        reflect = self.model.prior_distribution.well_reflected
+        for i, param in enumerate(self.variable_params):
+            if param in reflect:
+                logging.info("Param: %s will be well reflected", param)
+                reflective.append(i)
+
+        if len(reflective) == 0:
+            reflective = None
+
+        if 'sample' in kwargs:
+            if 'rwalk2' in kwargs['sample']:
+                dynesty.dynesty._SAMPLING["rwalk"] = sample_rwalk_mod
+                dynesty.nestedsamplers._SAMPLING["rwalk"] = sample_rwalk_mod
+                kwargs['sample'] = 'rwalk'
 
         if self.nlive < 0:
             # Interpret a negative input value for the number of live points
@@ -111,6 +140,8 @@ class DynestySampler(BaseSampler):
             self._sampler = dynesty.DynamicNestedSampler(log_likelihood_call,
                                                          prior_call, self.ndim,
                                                          pool=self.pool,
+                                                         reflective=reflective,
+                                                         periodic=periodic,
                                                          **kwargs)
             self.run_with_checkpoint = False
             logging.info("Checkpointing not currently supported with"
@@ -119,6 +150,8 @@ class DynestySampler(BaseSampler):
             self._sampler = dynesty.NestedSampler(log_likelihood_call,
                                                   prior_call, self.ndim,
                                                   nlive=self.nlive,
+                                                  reflective=reflective,
+                                                  periodic=periodic,
                                                   pool=self.pool, **kwargs)
 
         # properties of the internal sampler which should not be pickled
@@ -164,8 +197,74 @@ class DynestySampler(BaseSampler):
     @classmethod
     def from_config(cls, cp, model, output_file=None, nprocesses=1,
                     use_mpi=False, loglikelihood_function=None):
-        """
-        Loads the sampler from the given config file.
+        """Loads the sampler from the given config file. Many options are
+        directly passed to the underlying dynesty sampler, see the official
+        dynesty documentation for more details on these.
+
+        The following options are retrieved in the ``[sampler]`` section:
+        * ``name = STR`` :
+            Required. This must match the sampler's name.
+        * ``maxiter = INT``:
+            The maximum number of iterations to run.
+        * ``dlogz = FLOAT``:
+            The target dlogz stopping condition.
+        * ``logl_max = FLOAT``:
+            The maximum logl stopping condition.
+        * ``n_effective = INT``:
+            Target effective number of samples stopping condition
+        * ``sample = STR``:
+            The method to sample the space. Should be one of 'uniform',
+            'rwalk', 'rwalk2' (a modified version of rwalk), or 'slice'.
+        * ``walk = INT``:
+            Used for some of the walk methods. Sets the minimum number of
+            steps to take when evolving a point.
+        * ``maxmcmc = INT``:
+            Used for some of the walk methods. Sets the maximum number of steps
+            to take when evolving a point.
+        * ``nact = INT``:
+            used for some of the walk methods. Sets number of autorcorrelation
+            lengths before terminating evolution of a point.
+        * ``first_update_min_ncall = INT``:
+            The minimum number of calls before updating the bounding region
+            for the first time.
+        * ``first_update_min_neff = FLOAT``:
+            Don't update the the bounding region untill the efficiency drops
+            below this value.
+        * ``bound = STR``:
+            The method of bounding of the prior volume.
+            Should be one of 'single', 'balls', 'cubes', 'multi' or 'none'.
+        * ``update_interval = INT``:
+            Number of iterations between updating the bounding regions
+        * ``enlarge = FLOAT``:
+            Factor to enlarge the bonding region.
+        * ``bootstrap = INT``:
+            The number of bootstrap iterations to determine the enlargement
+            factor.
+        * ``maxcall = INT``:
+            The maximum number of calls before checking if we should checkpoint
+        * ``checkpoint_time_interval`` :
+            Sets the time in seconds between checkpointing.
+        * ``loglikelihood-function`` :
+            The attribute of the model to use for the loglikelihood. If
+            not provided, will default to ``loglikelihood``.
+
+        Parameters
+        ----------
+        cp : WorkflowConfigParser instance
+            Config file object to parse.
+        model : pycbc.inference.model.BaseModel instance
+            The model to use.
+        output_file : str, optional
+            The name of the output file to checkpoint and write results to.
+        nprocesses : int, optional
+            The number of parallel processes to use. Default is 1.
+        use_mpi : bool, optional
+            Use MPI for parallelization. Default is False.
+
+        Returns
+        -------
+        DynestySampler :
+            The sampler instance.
         """
         section = "sampler"
         # check name
@@ -190,13 +289,29 @@ class DynestySampler(BaseSampler):
                  'enlarge': float,
                  'update_interval': float,
                  'sample': str,
-                 'checkpoint_time_interval': float
+                 'checkpoint_time_interval': float,
+                 'first_update_min_ncall': int,
+                 'first_update_min_eff': float,
+                 'walks': int,
+                 'maxmcmc': int,
+                 'nact': int,
                  }
         extra = {}
         run_extra = {}
         for karg in cargs:
             if cp.has_option(section, karg):
                 extra[karg] = cargs[karg](cp.get(section, karg))
+
+        #This arg needs to be a dict
+        first_update = {}
+        if 'first_update_min_ncall' in extra:
+            first_update['min_ncall'] = extra.pop('first_update_min_ncall')
+            logging.info('First update: min_ncall:%s',
+                         first_update['min_ncall'])
+        if 'first_update_min_eff' in extra:
+            first_update['min_eff'] = extra.pop('first_update_min_eff')
+            logging.info('First update: min_eff:%s', first_update['min_eff'])
+        extra['first_update'] = first_update
 
         for karg in rargs:
             if cp.has_option(section, karg):
@@ -214,41 +329,32 @@ class DynestySampler(BaseSampler):
     def checkpoint(self):
         """Checkpoint function for dynesty sampler
         """
-        with loadfile(self.checkpoint_file, 'a') as fp:
-            fp.write_random_state()
+        # Dynesty has its own __getstate__ which deletes
+        # random state information and the pool
+        saved = {}
+        for key in self.no_pickle:
+            if hasattr(self._sampler, key):
+                saved[key] = getattr(self._sampler, key)
+                setattr(self._sampler, key, None)
+        for fn in [self.checkpoint_file, self.backup_file]:
+            with self.io(fn, "a") as fp:
+                # Write random state
+                fp.write_random_state()
 
-            # Dynesty has its own __getstate__ which deletes
-            # random state information and the pool
-            saved = {}
-            for key in self.no_pickle:
-                if hasattr(self._sampler, key):
-                    saved[key] = getattr(self._sampler, key)
-                    setattr(self._sampler, key, None)
+                # Write pickled data
+                fp.write_pickled_data_into_checkpoint_file(self._sampler)
 
-            # For the dynamic sampler, we must also handle the internal
-            # sampler object
-            #saved_internal = {}
-            #if self.nlive < 0:
-            #    for key in self.no_pickle:
-            #        if hasattr(self._sampler.sampler, key):
-            #            saved[key] = getattr(self._sampler.sampler, key)
-            #            setattr(self._sampler.sampler, key, None)
+                # Write nested samples
+                fp.write_raw_samples(self.samples)
 
-            #for key in self._sampler.__dict__:
-            #    print(key, type(self._sampler.__dict__[key]))
-
-            #for key in self._sampler.sampler.__dict__:
-            #    print(key, type(self._sampler.sampler.__dict__[key]))
-
-            fp.write_pickled_data_into_checkpoint_file(self._sampler)
+                # Write logz and dlogz
+                logz = self._sampler.results.logz[-1:][0]
+                dlogz = self._sampler.results.logzerr[-1:][0]
+                fp.write_logevidence(logz, dlogz)
 
         # Restore properties that couldn't be pickled if we are continuing
         for key in saved:
             setattr(self._sampler, key, saved[key])
-
-        # Restore for dynamic nested sampler's internal sampler
-        #for key in saved_internal:
-        #    setattr(self._sampler.sampler, key, saved_internal[key])
 
     def resume_from_checkpoint(self):
         try:
@@ -259,13 +365,6 @@ class DynestySampler(BaseSampler):
                     if key not in self.no_pickle:
                         value = getattr(sampler, key)
                         setattr(self._sampler, key, value)
-
-                # If dynamic sampling, also restore internal sampler
-                #if self.nlive < 0:
-                #    for key in sampler.__dict__:
-                #       if key not in self.no_pickle:
-                #           value = getattr(sampler.sampler, key)
-                #           setattr(self._sampler.sampler, key, value)
 
             self.set_state_from_file(self.checkpoint_file)
             logging.info("Found valid checkpoint file: %s",
@@ -285,15 +384,12 @@ class DynestySampler(BaseSampler):
         #    self._sampler.sampler.rstate = numpy.random
 
     def finalize(self):
+        """Finalze and write it to the results file
+        """
         logz = self._sampler.results.logz[-1:][0]
         dlogz = self._sampler.results.logzerr[-1:][0]
         logging.info("log Z, dlog Z: {}, {}".format(logz, dlogz))
-        for fn in [self.checkpoint_file]:
-            with self.io(fn, "a") as fp:
-                fp.write_logevidence(logz, dlogz)
-        logging.info("Writing samples to files")
-        for fn in [self.checkpoint_file, self.backup_file]:
-            self.write_results(fn)
+        self.checkpoint()
         logging.info("Validating checkpoint and backup files")
         checkpoint_valid = validate_checkpoint_files(
             self.checkpoint_file, self.backup_file, check_nsamples=False)
@@ -302,27 +398,16 @@ class DynestySampler(BaseSampler):
 
     @property
     def samples(self):
+        """Returns raw nested samples
+        """
         results = self._sampler.results
         samples = results.samples
-        weights = numpy.exp(results.logwt - results.logz[-1])
-        N = len(weights)
-        positions = (numpy.random.random() + numpy.arange(N)) / N
-
-        idx = numpy.zeros(N, dtype=numpy.int)
-        cumulative_sum = numpy.cumsum(weights)
-        i, j = 0, 0
-        while i < N:
-            if positions[i] < cumulative_sum[j]:
-                idx[i] = j
-                i += 1
-            else:
-                j += 1
-
-        numpy.random.shuffle(idx)
-        post = {'loglikelihood': self._sampler.results.logl[idx]}
+        nest_samp = {}
         for i, param in enumerate(self.variable_params):
-            post[param] = samples[:, i][idx]
-        return post
+            nest_samp[param] = samples[:, i]
+        nest_samp['logwt'] = results.logwt
+        nest_samp['loglikelihood'] = results.logl
+        return nest_samp
 
     def set_initial_conditions(self, initial_distribution=None,
                                samples_file=None):
@@ -344,7 +429,7 @@ class DynestySampler(BaseSampler):
         """
         with self.io(filename, 'a') as fp:
             # write samples
-            fp.write_samples(self.samples)
+            fp.write_raw_samples(self.samples)
 
             # write log evidence
             fp.write_logevidence(self._sampler.results.logz[-1:][0],
@@ -369,3 +454,159 @@ class DynestySampler(BaseSampler):
         dynesty sampler
         """
         return self._sampler.results.logzerr[-1:][0]
+
+
+def sample_rwalk_mod(args):
+    """ Modified version of dynesty.sampling.sample_rwalk
+
+        Adapted from version used in bilby/dynesty
+    """
+
+    # Unzipping.
+    (u, loglstar, axes, scale,
+     prior_transform, loglikelihood, kwargs) = args
+    rstate = numpy.random
+
+    # Bounds
+    nonbounded = kwargs.get('nonbounded', None)
+    periodic = kwargs.get('periodic', None)
+    reflective = kwargs.get('reflective', None)
+
+    # Setup.
+    n = len(u)
+    walks = kwargs.get('walks', 10 * n)  # minimum number of steps
+    maxmcmc = kwargs.get('maxmcmc', 2000)  # Maximum number of steps
+    nact = kwargs.get('nact', 5)  # Number of ACT
+    old_act = kwargs.get('old_act', walks)
+
+    # Initialize internal variables
+    accept = 0
+    reject = 0
+    nfail = 0
+    act = numpy.inf
+    u_list = []
+    v_list = []
+    logl_list = []
+
+    ii = 0
+    while ii < nact * act:
+        ii += 1
+
+        # Propose a direction on the unit n-sphere.
+        drhat = rstate.randn(n)
+        drhat /= numpy.linalg.norm(drhat)
+
+        # Scale based on dimensionality.
+        dr = drhat * rstate.rand() ** (1.0 / n)
+
+        # Transform to proposal distribution.
+        du = numpy.dot(axes, dr)
+        u_prop = u + scale * du
+
+        # Wrap periodic parameters
+        if periodic is not None:
+            u_prop[periodic] = numpy.mod(u_prop[periodic], 1)
+        # Reflect
+        if reflective is not None:
+            u_prop[reflective] = reflect(u_prop[reflective])
+
+        # Check unit cube constraints.
+        if unitcheck(u_prop, nonbounded):
+            pass
+        else:
+            nfail += 1
+            # Only start appending to the chain once a single jump is made
+            if accept > 0:
+                u_list.append(u_list[-1])
+                v_list.append(v_list[-1])
+                logl_list.append(logl_list[-1])
+            continue
+
+        # Check proposed point.
+        v_prop = prior_transform(numpy.array(u_prop))
+        logl_prop = loglikelihood(numpy.array(v_prop))
+        if logl_prop >= loglstar:
+            u = u_prop
+            v = v_prop
+            logl = logl_prop
+            accept += 1
+            u_list.append(u)
+            v_list.append(v)
+            logl_list.append(logl)
+        else:
+            reject += 1
+            # Only start appending to the chain once a single jump is made
+            if accept > 0:
+                u_list.append(u_list[-1])
+                v_list.append(v_list[-1])
+                logl_list.append(logl_list[-1])
+
+        # If we've taken the minimum number of steps, calculate the ACT
+        if accept + reject > walks:
+            act = estimate_nmcmc(
+                accept_ratio=accept / (accept + reject + nfail),
+                old_act=old_act, maxmcmc=maxmcmc)
+
+        # If we've taken too many likelihood evaluations then break
+        if accept + reject > maxmcmc:
+            logging.warning(
+                "Hit maximum number of walks {} with accept={}, reject={}, "
+                "and nfail={} try increasing maxmcmc"
+                .format(maxmcmc, accept, reject, nfail))
+            break
+
+    # If the act is finite, pick randomly from within the chain
+    if numpy.isfinite(act) and int(.5 * nact * act) < len(u_list):
+        idx = numpy.random.randint(int(.5 * nact * act), len(u_list))
+        u = u_list[idx]
+        v = v_list[idx]
+        logl = logl_list[idx]
+    else:
+        logging.debug("Unable to find a new point using walk: "
+                      "returning a random point")
+        u = numpy.random.uniform(size=n)
+        v = prior_transform(u)
+        logl = loglikelihood(v)
+
+    blob = {'accept': accept, 'reject': reject, 'fail': nfail, 'scale': scale}
+    kwargs["old_act"] = act
+
+    ncall = accept + reject
+    return u, v, logl, ncall, blob
+
+
+def estimate_nmcmc(accept_ratio, old_act, maxmcmc, safety=5, tau=None):
+    """ Estimate autocorrelation length of chain using acceptance fraction
+
+    Using ACL = (2/acc) - 1 multiplied by a safety margin. Code adapated from
+    CPNest:
+        - https://github.com/johnveitch/cpnest/blob/master/cpnest/sampler.py
+        - http://github.com/farr/Ensemble.jl
+
+    Parameters
+    ----------
+    accept_ratio: float [0, 1]
+        Ratio of the number of accepted points to the total number of points
+    old_act: int
+        The ACT of the last iteration
+    maxmcmc: int
+        The maximum length of the MCMC chain to use
+    safety: int
+        A safety factor applied in the calculation
+    tau: int (optional)
+        The ACT, if given, otherwise estimated.
+
+    """
+    if tau is None:
+        tau = maxmcmc / safety
+
+    if accept_ratio == 0.0:
+        Nmcmc_exact = (1 + 1 / tau) * old_act
+    else:
+        Nmcmc_exact = (
+            (1. - 1. / tau) * old_act +
+            (safety / tau) * (2. / accept_ratio - 1.)
+        )
+        Nmcmc_exact = float(min(Nmcmc_exact, maxmcmc))
+    return max(safety, int(Nmcmc_exact))
+

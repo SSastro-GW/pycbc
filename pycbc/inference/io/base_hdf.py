@@ -29,6 +29,12 @@ from __future__ import absolute_import
 
 import sys
 import logging
+# python 2.7 needs to use StingIO from the StringIO module; this was
+# deprecated in python 3
+if sys.version_info.major == 2:
+    from StringIO import StringIO
+else:
+    from io import StringIO
 
 from abc import (ABCMeta, abstractmethod)
 from six import (add_metaclass, string_types)
@@ -38,6 +44,8 @@ import h5py
 
 from pycbc.io import FieldArray
 from pycbc.inject import InjectionSet
+from pycbc.io import (dump_state, load_state)
+from pycbc.workflow import WorkflowConfigParser
 
 
 def format_attr(val):
@@ -92,6 +100,7 @@ class BaseInferenceFile(h5py.File):
     sampler_group = 'sampler_info'
     data_group = 'data'
     injections_group = 'injections'
+    config_group = 'config_file'
 
     def __init__(self, path, mode=None, **kwargs):
         super(BaseInferenceFile, self).__init__(path, mode, **kwargs)
@@ -661,6 +670,8 @@ class BaseInferenceFile(h5py.File):
         # if list of desired parameters is different, rename
         if set(parameters) != set(self.variable_params):
             other.attrs['variable_params'] = parameters
+        if read_args is None:
+            read_args = {}
         samples = self.read_samples(parameters, **read_args)
         logging.info("Copying {} samples".format(samples.size))
         # if different parameter names are desired, get them from the samples
@@ -671,7 +682,10 @@ class BaseInferenceFile(h5py.File):
             samples = FieldArray.from_kwargs(**arrs)
             other.attrs['variable_params'] = samples.fieldnames
         logging.info("Writing samples")
-        other.write_samples(other, samples, **write_args)
+        if write_args is None:
+            write_args = {}
+        other.write_samples({p: samples[p] for p in samples.fieldnames},
+                            **write_args)
 
     def copy(self, other, ignore=None, parameters=None, parameter_names=None,
              read_args=None, write_args=None):
@@ -760,14 +774,12 @@ class BaseInferenceFile(h5py.File):
             else:
                 attrs[arg] = val
 
-    def write_data(self, name, data, path=None):
+    def write_data(self, name, data, path=None, append=False):
         """Convenience function to write data.
 
         Given ``data`` is written as a dataset with ``name`` in ``path``.
-        If the data hasn't been written yet, the dataset will be created.
-        Otherwise, will overwrite the data that is there. If data already
-        exists in the file with the same name and path, the given data must
-        have the same shape.
+        If the dataset or path do not exist yet, the dataset and path will
+        be created.
 
         Parameters
         ----------
@@ -783,6 +795,14 @@ class BaseInferenceFile(h5py.File):
             Write to the given path. Default (None) will write to the top
             level. If the path does not exist in the file, it will be
             created.
+        append : bool, optional
+            Append the data to what is currently in the file if ``path/name``
+            already exists in the file, and if it does not, create the dataset
+            so that its last dimension can be resized. The data can only
+            be appended along the last dimension, and if it already exists in
+            the data, it must be resizable along this dimension. If ``False``
+            (the default) what is in the file will be overwritten, and the
+            given data must have the same shape.
         """
         if path is None:
             path = '/'
@@ -795,10 +815,101 @@ class BaseInferenceFile(h5py.File):
         if isinstance(data, dict):
             # call myself for each key, value pair in the dictionary
             for key, val in data.items():
-                self.write_data(key, val, path='/'.join([path, name]))
+                self.write_data(key, val, path='/'.join([path, name]),
+                                append=append)
+        # if appending, we need to resize the data on disk, or, if it doesn't
+        # exist yet, create a dataset that is resizable along the last
+        # dimension
+        elif append:
+            # cast the data to an array if it isn't already one
+            if isinstance(data, (list, tuple)):
+                data = numpy.array(data)
+            if not isinstance(data, numpy.ndarray):
+                data = numpy.array([data])
+            dshape = data.shape
+            ndata = dshape[-1]
+            try:
+                startidx = group[name].shape[-1]
+                group[name].resize(dshape[-1]+group[name].shape[-1],
+                                   axis=len(group[name].shape)-1)
+            except KeyError:
+                # dataset doesn't exist yet
+                group.create_dataset(name, dshape,
+                                     maxshape=tuple(list(dshape)[:-1]+[None]),
+                                     dtype=data.dtype, fletcher32=True)
+                startidx = 0
+            group[name][..., startidx:startidx+ndata] = data[..., :]
         else:
             try:
                 group[name][()] = data
             except KeyError:
                 # dataset doesn't exist yet
                 group[name] = data
+
+    def write_config_file(self, cp):
+        """Writes the given config file parser.
+
+        File is stored as a pickled buffer array to ``config_parser/{index}``,
+        where ``{index}`` is an integer corresponding to the number of config
+        files that have been saved. The first time a save is called, it is
+        stored to ``0``, and incremented from there.
+
+        Parameters
+        ----------
+        cp : ConfigParser
+            Config parser to save.
+        """
+        # get the index of the last saved file
+        try:
+            index = list(map(int, self[self.config_group].keys()))
+        except KeyError:
+            index = []
+        if index == []:
+            # hasn't been written yet
+            index = 0
+        else:
+            index = max(index) + 1
+        # we'll store the config file as a text file that is pickled
+        out = StringIO()
+        cp.write(out)
+        # now pickle it
+        dump_state(out, self, path=self.config_group, dsetname=str(index))
+
+    def read_config_file(self, return_cp=True, index=-1):
+        """Reads the config file that was used.
+
+        A ``ValueError`` is raised if no config files have been saved, or if
+        the requested index larger than the number of stored config files.
+
+        Parameters
+        ----------
+        return_cp : bool, optional
+            If true, returns the loaded config file as
+            :py:class:`pycbc.workflow.configuration.WorkflowConfigParser`
+            type. Otherwise will return as string buffer. Default is True.
+        index : int, optional
+            The config file to load. If ``write_config_file`` has been called
+            multiple times (as would happen if restarting from a checkpoint),
+            there will be config files stored. Default (-1) is to load the
+            last saved file.
+
+        Returns
+        -------
+        WorkflowConfigParser or StringIO :
+            The parsed config file.
+        """
+        # get the stored indices
+        try:
+            indices = sorted(map(int, self[self.config_group].keys()))
+            index = indices[index]
+        except KeyError:
+            raise ValueError("no config files saved in hdf")
+        except IndexError:
+            raise ValueError("no config file matches requested index")
+        cf = load_state(self, path=self.config_group, dsetname=str(index))
+        cf.seek(0)
+        if return_cp:
+            cp = WorkflowConfigParser()
+            cp.read_file(cf)
+            return cp
+        return cf
